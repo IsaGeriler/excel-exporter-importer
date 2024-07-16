@@ -96,14 +96,9 @@ public class ExporterUtil {
     public void saveToFile(String fileName) {
         try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
             workbook.write(fileOutputStream);
+            workbook.close();
         } catch (Exception e) {
             logger.error("[INFO] An error occurred: ", e);
-        } finally {
-            try {
-                workbook.close();
-            } catch (Exception e) {
-                logger.error("[INFO] An error occurred: ", e);
-            }
         }
     }
 
