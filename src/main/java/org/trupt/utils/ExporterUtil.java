@@ -10,19 +10,22 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.trupt.annotation.ExcelCellHeader;
 import org.trupt.config.Log4j2Config;
 
-import java.io.FileOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
 
 public class ExporterUtil {
     private static final Logger logger = Log4j2Config.getLogger(ExporterUtil.class);
-    private final XSSFWorkbook workbook = new XSSFWorkbook();
-    private final XSSFSheet sheet = workbook.createSheet("Sheet1");
 
-    public void exportFile(List<?> list) {
-        try {
+    public ByteArrayInputStream exportFile(List<?> list, List<String> cellHeaderList,
+                                           boolean calculateAverage, boolean calculateSum) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
+            XSSFSheet sheet = workbook.createSheet("Sheet1");
             XSSFRow headerRow = sheet.createRow(0);
+
             Class<?> clazz = list.get(0).getClass();
             Field[] fields = clazz.getDeclaredFields();
 
@@ -80,25 +83,20 @@ public class ExporterUtil {
                 }
             }
             sheet.createRow(dataCellNo);
+
+            // Calculate statistics based on the flags
+            if (calculateAverage) {
+                calculateStatistic(sheet, cellHeaderList, "ORTALAMA", "AVERAGEA", workbook);
+            }
+            if (calculateSum) {
+                calculateStatistic(sheet, cellHeaderList, "TOPLAM", "SUM", workbook);
+            }
+
+            workbook.write(byteArrayOutputStream);
+            return new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
         } catch (Exception e) {
             logger.error("[INFO] An error occurred: ", e);
-        }
-    }
-
-    public void calculateAverage(List<String> cellHeaderList) {
-        calculateStatistic(sheet, cellHeaderList, "ORTALAMA", "AVERAGEA", workbook);
-    }
-
-    public void calculateSum(List<String> cellHeaderList) {
-        calculateStatistic(sheet, cellHeaderList, "TOPLAM", "SUM", workbook);
-    }
-
-    public void saveToFile(String fileName) {
-        try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
-            workbook.write(fileOutputStream);
-            workbook.close();
-        } catch (Exception e) {
-            logger.error("[INFO] An error occurred: ", e);
+            return null;
         }
     }
 
