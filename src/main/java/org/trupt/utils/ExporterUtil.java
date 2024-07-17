@@ -3,10 +3,7 @@ package org.trupt.utils;
 import org.apache.logging.log4j.Logger;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.ss.util.CellReference;
-import org.apache.poi.xssf.usermodel.XSSFCell;
-import org.apache.poi.xssf.usermodel.XSSFRow;
-import org.apache.poi.xssf.usermodel.XSSFSheet;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.usermodel.*;
 import org.trupt.annotation.ExcelCellHeader;
 import org.trupt.config.Log4j2Config;
 
@@ -81,18 +78,24 @@ public class ExporterUtil {
                     }
                 }
             }
-            sheet.createRow(dataCellNo);
+
+            // Create rows for SUM and AVERAGE calculations
+            int sumRowNum = sheet.getLastRowNum() + 1;
+            XSSFRow sumRow = sheet.createRow(sumRowNum);
+
+            int avgRowNum = sheet.getLastRowNum() + 1;
+            XSSFRow avgRow = sheet.createRow(avgRowNum);
 
             for (Field field : fields) {
                 if (field.isAnnotationPresent(ExcelCellHeader.class)) {
                     ExcelCellHeader column = field.getAnnotation(ExcelCellHeader.class);
                     if (column.calculateSum()) {
                         String sumHeader = column.headerName();
-                        calculateStatistic(sheet, sumHeader, "TOPLAM", "SUM", workbook);
+                        calculateStatistic(sheet, sumHeader, "TOPLAM", "SUM", workbook, sumRow);
                     }
                     if (column.calculateAverage()) {
                         String avgHeader = column.headerName();
-                        calculateStatistic(sheet, avgHeader, "ORTALAMA", "AVERAGEA", workbook);
+                        calculateStatistic(sheet, avgHeader, "ORTALAMA", "AVERAGEA", workbook, avgRow);
                     }
                 }
             }
@@ -180,37 +183,37 @@ public class ExporterUtil {
 
     private void processCellHeaders(XSSFSheet sheet, XSSFRow headerRow, XSSFRow targetRow,
                                     String cellHeader, String formulaType) throws Exception {
-            int targetCellNum = findTargetCellNum(headerRow, cellHeader);
+        int targetCellNum = findTargetCellNum(headerRow, cellHeader);
 
-            // Find the first and last non-empty cells in the column
-            int firstDataRow = firstNonEmptyCellNo(sheet, targetCellNum);
-            int lastDataRow = lastNonEmptyCellNo(sheet, targetCellNum);
+        // Find the first and last non-empty cells in the column
+        int firstDataRow = firstNonEmptyCellNo(sheet, targetCellNum);
+        int lastDataRow = lastNonEmptyCellNo(sheet, targetCellNum);
 
-            if (firstDataRow == -1 || lastDataRow == -1) {
-                throw new Exception("No data found in column '" + cellHeader+ "'.");
-            }
+        if (firstDataRow == -1 || lastDataRow == -1) {
+            throw new Exception("No data found in column '" + cellHeader + "'.");
+        }
 
-            XSSFCell formulaCell = targetRow.createCell(targetCellNum);
-            formulaCell.setCellFormula(formulaType + "(" + CellReference.convertNumToColString(targetCellNum)
-                    + firstDataRow + ":" + CellReference.convertNumToColString(targetCellNum) + lastDataRow + ")");
+        XSSFCell formulaCell = targetRow.createCell(targetCellNum);
+        formulaCell.setCellFormula(formulaType + "(" + CellReference.convertNumToColString(targetCellNum)
+                + firstDataRow + ":" + CellReference.convertNumToColString(targetCellNum) + lastDataRow + ")");
     }
 
-    private void calculateStatistic(XSSFSheet sheet, String cellHeader, String label, String formula, Workbook workbook) {
+    private void calculateStatistic(XSSFSheet sheet, String cellHeader, String label, String formula, Workbook workbook, XSSFRow targetRow) {
         try {
-            int rowNum = sheet.getLastRowNum() + 1;
-            XSSFRow row = sheet.createRow(rowNum);
+            // Add label only once in the first cell of the statistics row
+            if (targetRow.getCell(0) == null) {
+                targetRow.createCell(0).setCellValue(label);
+                makeCellBoldAndYellow(workbook, targetRow.getCell(0));
 
-            row.createCell(0).setCellValue(label);
-            makeCellBoldAndYellow(workbook, row.getCell(0));
-
-            int columnWidth = row.getCell(0).getStringCellValue().length();
-            int currentWidth = sheet.getColumnWidth(0) / 256;
-            if (columnWidth + 2 > currentWidth) {
-                sheet.setColumnWidth(0, (columnWidth + 2) * 256);
+                int columnWidth = targetRow.getCell(0).getStringCellValue().length();
+                int currentWidth = sheet.getColumnWidth(0) / 256;
+                if (columnWidth + 2 > currentWidth) {
+                    sheet.setColumnWidth(0, (columnWidth + 2) * 256);
+                }
             }
 
             XSSFRow headerRow = sheet.getRow(0); // Assuming the first row is the header row
-            processCellHeaders(sheet, headerRow, row, cellHeader, formula);
+            processCellHeaders(sheet, headerRow, targetRow, cellHeader, formula);
         } catch (Exception e) {
             System.out.println("An error occurred while setting field value: " + Arrays.toString(e.getStackTrace()));
         }
