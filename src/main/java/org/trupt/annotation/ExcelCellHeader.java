@@ -10,4 +10,6 @@ import java.lang.annotation.Target;
 public @interface ExcelCellHeader {
     String headerName() default "";
     boolean isRequired() default false;
+    boolean calculateAverage() default false;
+    boolean calculateSum() default false;
 }

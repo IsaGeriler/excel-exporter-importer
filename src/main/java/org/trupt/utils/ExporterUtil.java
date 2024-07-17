@@ -19,8 +19,7 @@ import java.util.List;
 public class ExporterUtil {
     private static final Logger logger = Log4j2Config.getLogger(ExporterUtil.class);
 
-    public ByteArrayInputStream exportFile(List<?> list, List<String> cellHeaderList,
-                                           boolean calculateAverage, boolean calculateSum) {
+    public ByteArrayInputStream exportFile(List<?> list) {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
             XSSFSheet sheet = workbook.createSheet("Sheet1");
@@ -84,14 +83,19 @@ public class ExporterUtil {
             }
             sheet.createRow(dataCellNo);
 
-            // Calculate statistics based on the flags
-            if (calculateAverage) {
-                calculateStatistic(sheet, cellHeaderList, "ORTALAMA", "AVERAGEA", workbook);
+            for (Field field : fields) {
+                if (field.isAnnotationPresent(ExcelCellHeader.class)) {
+                    ExcelCellHeader column = field.getAnnotation(ExcelCellHeader.class);
+                    if (column.calculateSum()) {
+                        String sumHeader = column.headerName();
+                        calculateStatistic(sheet, sumHeader, "TOPLAM", "SUM", workbook);
+                    }
+                    if (column.calculateAverage()) {
+                        String avgHeader = column.headerName();
+                        calculateStatistic(sheet, avgHeader, "ORTALAMA", "AVERAGEA", workbook);
+                    }
+                }
             }
-            if (calculateSum) {
-                calculateStatistic(sheet, cellHeaderList, "TOPLAM", "SUM", workbook);
-            }
-
             workbook.write(byteArrayOutputStream);
             return new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
         } catch (Exception e) {
@@ -175,8 +179,7 @@ public class ExporterUtil {
     }
 
     private void processCellHeaders(XSSFSheet sheet, XSSFRow headerRow, XSSFRow targetRow,
-                                    List<String> cellHeaderList, String formulaType) throws Exception {
-        for (String cellHeader : cellHeaderList) {
+                                    String cellHeader, String formulaType) throws Exception {
             int targetCellNum = findTargetCellNum(headerRow, cellHeader);
 
             // Find the first and last non-empty cells in the column
@@ -184,17 +187,15 @@ public class ExporterUtil {
             int lastDataRow = lastNonEmptyCellNo(sheet, targetCellNum);
 
             if (firstDataRow == -1 || lastDataRow == -1) {
-                throw new Exception("No data found in column '" + cellHeader + "'.");
+                throw new Exception("No data found in column '" + cellHeader+ "'.");
             }
 
             XSSFCell formulaCell = targetRow.createCell(targetCellNum);
             formulaCell.setCellFormula(formulaType + "(" + CellReference.convertNumToColString(targetCellNum)
                     + firstDataRow + ":" + CellReference.convertNumToColString(targetCellNum) + lastDataRow + ")");
-        }
     }
 
-    private void calculateStatistic(XSSFSheet sheet, List<String> cellHeaderList,
-                                    String label, String formula, Workbook workbook) {
+    private void calculateStatistic(XSSFSheet sheet, String cellHeader, String label, String formula, Workbook workbook) {
         try {
             int rowNum = sheet.getLastRowNum() + 1;
             XSSFRow row = sheet.createRow(rowNum);
@@ -209,7 +210,7 @@ public class ExporterUtil {
             }
 
             XSSFRow headerRow = sheet.getRow(0); // Assuming the first row is the header row
-            processCellHeaders(sheet, headerRow, row, cellHeaderList, formula);
+            processCellHeaders(sheet, headerRow, row, cellHeader, formula);
         } catch (Exception e) {
             System.out.println("An error occurred while setting field value: " + Arrays.toString(e.getStackTrace()));
         }
