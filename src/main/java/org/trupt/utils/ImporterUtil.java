@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 public class ImporterUtil {
-    private static final Logger logger = Log4j2Config.getLogger(ExporterUtil.class);
+    private static final Logger logger = Log4j2Config.getLogger(ImporterUtil.class);
     private final TypeHandlerStorage typeHandlerStorage = new TypeHandlerStorage();
 
     public <Type> List<Type> importFile(File file, Class<Type> type) {
