@@ -12,13 +12,16 @@ import java.io.ByteArrayOutputStream;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.ResourceBundle;
 
 public class ExporterUtil {
     private static final Logger logger = Log4j2Config.getLogger(ExporterUtil.class);
 
-    public ByteArrayInputStream exportFile(List<?> list) {
+    public ByteArrayInputStream exportFile(List<?> list, Locale locale) {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
+            ResourceBundle resourceBundle = ResourceBundle.getBundle("Bundle", locale);
             XSSFSheet sheet = workbook.createSheet("Sheet1");
             XSSFRow headerRow = sheet.createRow(0);
 
@@ -30,11 +33,11 @@ public class ExporterUtil {
                 if (field.isAnnotationPresent(ExcelCellHeader.class)) {
                     ExcelCellHeader column = field.getAnnotation(ExcelCellHeader.class);
                     XSSFCell cell = headerRow.createCell(headerCellNo);
-                    cell.setCellValue(column.headerName());
+                    cell.setCellValue(resourceBundle.getString(column.headerName()));
                     makeRowBoldAndYellow(workbook, headerRow);
 
                     // Set initial column width based on header cell value
-                    sheet.setColumnWidth(headerCellNo, (column.headerName().length() + 2) * 256);
+                    sheet.setColumnWidth(headerCellNo, (resourceBundle.getString(column.headerName()).length() + 2) * 256);
                     headerCellNo++;
                 }
             }
@@ -90,12 +93,14 @@ public class ExporterUtil {
                 if (field.isAnnotationPresent(ExcelCellHeader.class)) {
                     ExcelCellHeader column = field.getAnnotation(ExcelCellHeader.class);
                     if (column.calculateSum()) {
-                        String sumHeader = column.headerName();
-                        calculateStatistic(sheet, sumHeader, "TOPLAM", "SUM", workbook, sumRow);
+                        String sumHeader = resourceBundle.getString(column.headerName());
+                        calculateStatistic(sheet, sumHeader, resourceBundle.getString("sumRowName"),
+                                "SUM", workbook, sumRow);
                     }
                     if (column.calculateAverage()) {
-                        String avgHeader = column.headerName();
-                        calculateStatistic(sheet, avgHeader, "ORTALAMA", "AVERAGEA", workbook, avgRow);
+                        String avgHeader = resourceBundle.getString(column.headerName());
+                        calculateStatistic(sheet, avgHeader, resourceBundle.getString("avgRowName"),
+                                "AVERAGEA", workbook, avgRow);
                     }
                 }
             }
