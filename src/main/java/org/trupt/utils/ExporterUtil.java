@@ -9,6 +9,7 @@ import org.trupt.config.Log4j2Config;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
@@ -19,8 +20,12 @@ public class ExporterUtil {
     private static final Logger logger = Log4j2Config.getLogger(ExporterUtil.class);
 
     public ByteArrayInputStream exportFile(List<?> list, Locale locale) {
-        try (XSSFWorkbook workbook = new XSSFWorkbook();
-             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
+        if (list.isEmpty()) {
+            logger.error("[ERROR] The provided list is empty.");
+            throw new IllegalArgumentException("List cannot be empty.");
+        }
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream()) {
             ResourceBundle resourceBundle = ResourceBundle.getBundle("Bundle", locale);
             XSSFSheet sheet = workbook.createSheet("Sheet1");
             XSSFRow headerRow = sheet.createRow(0);
@@ -72,8 +77,7 @@ public class ExporterUtil {
                             }
                         } catch (Exception e) {
                             field.setAccessible(false);
-                            System.out.println("An error occurred while setting field value: "
-                                    + Arrays.toString(e.getStackTrace()));
+                            logger.error("[ERROR] An error occurred while setting field value: " + Arrays.toString(e.getStackTrace()));
                         } finally {
                             field.setAccessible(false);
                         }
@@ -94,21 +98,22 @@ public class ExporterUtil {
                     ExcelCellHeader column = field.getAnnotation(ExcelCellHeader.class);
                     if (column.calculateSum()) {
                         String sumHeader = resourceBundle.getString(column.headerName());
-                        calculateStatistic(sheet, sumHeader, resourceBundle.getString("sumRowName"),
-                                "SUM", workbook, sumRow);
+                        calculateStatistic(sheet, sumHeader, resourceBundle.getString("sumRowName"), "SUM", workbook, sumRow);
                     }
                     if (column.calculateAverage()) {
                         String avgHeader = resourceBundle.getString(column.headerName());
-                        calculateStatistic(sheet, avgHeader, resourceBundle.getString("avgRowName"),
-                                "AVERAGEA", workbook, avgRow);
+                        calculateStatistic(sheet, avgHeader, resourceBundle.getString("avgRowName"), "AVERAGEA", workbook, avgRow);
                     }
                 }
             }
             workbook.write(byteArrayOutputStream);
             return new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
-        } catch (Exception e) {
-            logger.error("[INFO] An error occurred: ", e);
-            return null;
+        } catch (IOException e) {
+            logger.error("Error writing workbook to output stream: ", e);
+            throw new RuntimeException("Error exporting file", e);
+        } catch (IllegalArgumentException e) {
+            logger.error("Invalid argument error: ", e);
+            throw new RuntimeException("Error exporting file", e);
         }
     }
 
@@ -186,21 +191,26 @@ public class ExporterUtil {
         return lastDataRow;
     }
 
-    private void processCellHeaders(XSSFSheet sheet, XSSFRow headerRow, XSSFRow targetRow,
-                                    String cellHeader, String formulaType) throws Exception {
-        int targetCellNum = findTargetCellNum(headerRow, cellHeader);
+    private void processCellHeaders(XSSFSheet sheet, XSSFRow headerRow, XSSFRow targetRow, String cellHeader, String formulaType) throws Exception {
+        try {
+            int targetCellNum = findTargetCellNum(headerRow, cellHeader);
+            int firstDataRow = firstNonEmptyCellNo(sheet, targetCellNum); // Find the first non-empty cell in the column
+            int lastDataRow = lastNonEmptyCellNo(sheet, targetCellNum); // Find the last non-empty cell in the column
 
-        // Find the first and last non-empty cells in the column
-        int firstDataRow = firstNonEmptyCellNo(sheet, targetCellNum);
-        int lastDataRow = lastNonEmptyCellNo(sheet, targetCellNum);
+            if (firstDataRow == -1 || lastDataRow == -1) {
+                throw new Exception("No data found in column '" + cellHeader + "'.");
+            }
 
-        if (firstDataRow == -1 || lastDataRow == -1) {
-            throw new Exception("No data found in column '" + cellHeader + "'.");
+            XSSFCell formulaCell = targetRow.createCell(targetCellNum);
+            formulaCell.setCellFormula(formulaType + "(" + CellReference.convertNumToColString(targetCellNum)
+                    + firstDataRow + ":" + CellReference.convertNumToColString(targetCellNum) + lastDataRow + ")");
+        } catch (IllegalArgumentException e) {
+            logger.error("[ERROR] Invalid argument for cell header processing: ", e);
+            throw new RuntimeException("Error processing cell headers", e);
+        } catch (ReflectiveOperationException e) {
+            logger.error(" [ERROR] Reflection error during cell header processing: ", e);
+            throw new RuntimeException("Error processing cell headers", e);
         }
-
-        XSSFCell formulaCell = targetRow.createCell(targetCellNum);
-        formulaCell.setCellFormula(formulaType + "(" + CellReference.convertNumToColString(targetCellNum)
-                + firstDataRow + ":" + CellReference.convertNumToColString(targetCellNum) + lastDataRow + ")");
     }
 
     private void calculateStatistic(XSSFSheet sheet, String cellHeader, String label, String formula, Workbook workbook, XSSFRow targetRow) {
@@ -220,7 +230,7 @@ public class ExporterUtil {
             XSSFRow headerRow = sheet.getRow(0); // Assuming the first row is the header row
             processCellHeaders(sheet, headerRow, targetRow, cellHeader, formula);
         } catch (Exception e) {
-            System.out.println("An error occurred while setting field value: " + Arrays.toString(e.getStackTrace()));
+            logger.error("[ERROR] An error occurred while setting field value: " + Arrays.toString(e.getStackTrace()));
         }
     }
 }
