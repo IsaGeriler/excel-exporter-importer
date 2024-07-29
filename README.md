@@ -46,10 +46,10 @@ This project is intended to be used as a dependency for the "RESTful Export Impo
 **Maven:**
 ```xml
 <!-- excel-exporter-importer.jar Dependency -->
-		<dependency>
-			<groupId>org.example</groupId>
-			<artifactId>excel-exporter-importer</artifactId>
-			<version>1.0-SNAPSHOT</version>
+    <dependency>
+        <groupId>org.example</groupId>
+        <artifactId>excel-exporter-importer</artifactId>
+	<version>1.0-SNAPSHOT</version>
     </dependency>
 ```
 
