@@ -39,6 +39,11 @@ This project is intended to be used as a dependency for the "RESTful Export Impo
    mvn clean install
    ```
 
+   Maven Wrapper:
+   ```bash
+   ./mvnw clean install
+   ```
+
 ## Usage
 
 ### Inside "RESTful Export Import API" Project, add the dependency to your `pom.xml` file:
